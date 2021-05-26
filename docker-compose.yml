@@ -1,0 +1,77 @@
+version: "3"
+services:
+  mariadb:
+    container_name: lara_mariadb
+    image: mariadb
+    restart: always
+    tty: true
+    ports:
+      - 33061:3306
+    environment:
+      - MARIADB_ROOT_PASSWORD=${DB_PASSWORD}
+      - MARIADB_DATABASE=${DB_DATABASE}
+      - MARIADB_USER=${DB_USERNAME}
+    volumes:
+      - ./docker/mariadb/datadir:/var/lib/mariadb/data
+    networks:
+      - internal
+
+  adminer:
+    container_name: lara_adminer
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+  memecached:
+    container_name: lara_memecached
+    image: memcached
+    networks:
+      - internal
+  nginx:
+    container_name: lara_nginx
+    build:
+      context: ./docker/nginx
+    ports:
+      - 8888:80
+      - 4443:443
+    volumes:
+      - ./:/var/www
+      - ./storage/app/public:/var/www/public/storage
+    depends_on:
+      - php
+    networks:
+      - internal
+  php:
+    container_name: lara_php
+    build:
+      context: ./docker/php
+    volumes:
+      - ./:/var/www
+    environment:
+      XDEBUG_CONFIG: "remote_host=192.168.88.44 remote_enable=1"
+      PHP_IDE_CONFIG: "serverName=Docker"
+    depends_on:
+      - mariadb
+      - memecached
+    networks:
+      - internal
+  node:
+    image: "node"
+    user: "node"
+    working_dir: /home/node/app
+    environment:
+      - NODE_ENV=dev
+    volumes:
+      - ./:/home/node/app
+    expose:
+      - "8081"
+    command: "npm run dev"
+    networks:
+      - internal
+networks:
+  internal:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.88.44/28
